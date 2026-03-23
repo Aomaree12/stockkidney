@@ -2597,29 +2597,57 @@ async function confirmUseStock() {
       currentDeleteId = null;
     }
 
-    async function confirmDelete() {
-      if (!currentDeleteId) return;
+async function confirmDelete() {
+  if (!currentDeleteId) return;
+  
+  const item = inventoryData.find(i => i.id === currentDeleteId);
+  if (!item) return;
+  
+  const confirmBtn = document.getElementById('confirm-delete-btn');
+  const confirmText = document.getElementById('confirm-delete-text');
+  confirmBtn.disabled = true;
+  confirmText.innerHTML = '<span class="loading-spinner"></span>';
+  
+  try {
+    const payload = {
+      action: 'deleteInventoryItem', // ชื่อ action ต้องตรงกับใน GAS
+      spreadsheetId: SOURCE_SPREADSHEET_ID,
+      sheetName: SOURCE_SHEET_NAME,
+      id: currentDeleteId // ส่ง ID ของแถวที่จะลบไป
+    };
+    
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain'
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      // ลบข้อมูลออกจาก Array ในหน้าเว็บด้วย เพื่อให้หน้าจออัปเดตทันที
+      inventoryData = inventoryData.filter(i => i.id !== currentDeleteId);
       
-      const item = inventoryData.find(i => i.id === currentDeleteId);
-      if (!item) return;
+      renderInventory(inventoryData);
+      updateStats(inventoryData);
+      if (currentPage === 'dashboard') updateDashboard();
       
-      const confirmBtn = document.getElementById('confirm-delete-btn');
-      const confirmText = document.getElementById('confirm-delete-text');
-      confirmBtn.disabled = true;
-      confirmText.innerHTML = '<span class="loading-spinner"></span>';
-      
-      const result = await window.dataSdk.delete(item);
-      if (result && result.isOk) {
-        showToast('ลบรายการสำเร็จ');
-        hideDeleteModal();
-        hideDetailModal();
-      } else {
-        showToast('เกิดข้อผิดพลาดในการลบ กรุณาลองใหม่', true);
-      }
-      
-      confirmBtn.disabled = false;
-      confirmText.textContent = 'ยืนยันการลบ';
+      showToast('ลบรายการสำเร็จ');
+      hideDeleteModal();
+      hideDetailModal(); // ปิด modal รายละเอียดด้วยถ้าเปิดอยู่
+    } else {
+      showToast('เกิดข้อผิดพลาด: ' + (result.error || 'ไม่สามารถลบได้'), true);
     }
+  } catch (error) {
+    console.error('Error deleting item:', error);
+    showToast('เกิดข้อผิดพลาดในการเชื่อมต่อ', true);
+  } finally {
+    confirmBtn.disabled = false;
+    confirmText.textContent = 'ยืนยันการลบ';
+  }
+}
 
     document.getElementById('filter-category').addEventListener('change', function(e) {
       currentFilter = e.target.value;
