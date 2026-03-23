@@ -2539,6 +2539,58 @@ document.getElementById('item-form').addEventListener('submit', async function(e
     }
 
 async function confirmUseStock() {
+  if (!currentUseId) return;
+  
+  const itemIndex = inventoryData.findIndex(i => i.id === currentUseId);
+  if (itemIndex === -1) return;
+  const item = inventoryData[itemIndex];
+  
+  const useQty = parseInt(document.getElementById('use-quantity-input').value);
+  const remainingStock = (item.quantity || 0) - (item.usedQuantity || 0);
+  
+  if (useQty <= 0 || useQty > remainingStock) {
+    showToast('จำนวนไม่ถูกต้อง', true);
+    return;
+  }
+  
+  const confirmBtn = document.getElementById('confirm-use-btn');
+  const confirmText = document.getElementById('confirm-use-text');
+  confirmBtn.disabled = true;
+  confirmText.innerHTML = '<span class="loading-spinner"></span>';
+  
+  try {
+    // ส่งข้อมูลไปอัปเดตที่ Google Sheets
+    const saveResult = await saveInventoryToSheet(item, useQty);
+    
+    if (saveResult.success) {
+      const newUsed = (item.usedQuantity || 0) + useQty;
+      const finalRemaining = item.quantity - newUsed;
+
+      if (finalRemaining <= 0) {
+        // ถ้าหมดสต็อก ให้ลบออกจากรายการบนหน้าเว็บทันที (เพื่อให้ตรงกับ GAS ที่สั่งลบแถว)
+        inventoryData.splice(itemIndex, 1);
+        showToast(`เบิกใช้งานหมดแล้ว ระบบลบรายการออกจากคลังอัตโนมัติค่ะ`);
+      } else {
+        // ถ้ายังเหลือ ให้อัปเดตตัวเลข
+        inventoryData[itemIndex].usedQuantity = newUsed;
+        showToast(`ตัดสต็อกสำเร็จ ${useQty} ชิ้นค่ะ`);
+      }
+      
+      renderInventory(inventoryData);
+      updateStats(inventoryData);
+      if (currentPage === 'dashboard') updateDashboard();
+      hideUseStockModal();
+    } else {
+      showToast('เกิดข้อผิดพลาดในการเชื่อมต่อ Google Sheets', true);
+    }
+  } catch (error) {
+    console.error('Error in confirmUseStock:', error);
+    showToast('ระบบขัดข้อง: ' + error.message, true);
+  } finally {
+    confirmBtn.disabled = false;
+    confirmText.textContent = 'ยืนยันตัดสต็อก';
+  }
+}
 
     function showDeleteModal(id) {
       const item = inventoryData.find(i => i.id === id);
