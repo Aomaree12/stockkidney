@@ -6,6 +6,7 @@
   <title>ระบบบริหารเวชภัณฑ์ปลอดเชื้อ ไตเทียม</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     body {
       box-sizing: border-box;
@@ -2538,58 +2539,116 @@ document.getElementById('item-form').addEventListener('submit', async function(e
       currentUseId = null;
     }
 
-async function confirmUseStock() {
-  if (!currentUseId) return;
-  
-  const itemIndex = inventoryData.findIndex(i => i.id === currentUseId);
-  if (itemIndex === -1) return;
-  const item = inventoryData[itemIndex];
-  
-  const useQty = parseInt(document.getElementById('use-quantity-input').value);
-  const remainingStock = (item.quantity || 0) - (item.usedQuantity || 0);
-  
-  if (useQty <= 0 || useQty > remainingStock) {
-    showToast('จำนวนไม่ถูกต้อง', true);
-    return;
-  }
-  
-  const confirmBtn = document.getElementById('confirm-use-btn');
-  const confirmText = document.getElementById('confirm-use-text');
-  confirmBtn.disabled = true;
-  confirmText.innerHTML = '<span class="loading-spinner"></span>';
-  
-  try {
-    // ส่งข้อมูลไปอัปเดตที่ Google Sheets
-    const saveResult = await saveInventoryToSheet(item, useQty);
-    
-    if (saveResult.success) {
-      const newUsed = (item.usedQuantity || 0) + useQty;
-      const finalRemaining = item.quantity - newUsed;
+// 1. เพิ่ม Library SweetAlert2 ในส่วน <head> หรือก่อนปิด </body> ก็ได้ค่ะ
+// <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-      if (finalRemaining <= 0) {
-        // ถ้าหมดสต็อก ให้ลบออกจากรายการบนหน้าเว็บทันที (เพื่อให้ตรงกับ GAS ที่สั่งลบแถว)
-        inventoryData.splice(itemIndex, 1);
-        showToast(`เบิกใช้งานหมดแล้ว ระบบลบรายการออกจากคลังอัตโนมัติค่ะ`);
-      } else {
-        // ถ้ายังเหลือ ให้อัปเดตตัวเลข
-        inventoryData[itemIndex].usedQuantity = newUsed;
-        showToast(`ตัดสต็อกสำเร็จ ${useQty} ชิ้นค่ะ`);
-      }
-      
-      renderInventory(inventoryData);
-      updateStats(inventoryData);
-      if (currentPage === 'dashboard') updateDashboard();
-      hideUseStockModal();
-    } else {
-      showToast('เกิดข้อผิดพลาดในการเชื่อมต่อ Google Sheets', true);
+// แก้ไขฟังก์ชัน confirmUseStock ที่หายไปและทำให้เครื่องค้าง
+async function confirmUseStock() {
+    if (!currentUseId) return;
+    
+    const itemIndex = inventoryData.findIndex(i => i.id === currentUseId);
+    if (itemIndex === -1) return;
+    const item = inventoryData[itemIndex];
+    
+    const useQty = parseInt(document.getElementById('use-quantity-input').value);
+    const remainingStock = (item.quantity || 0) - (item.usedQuantity || 0);
+    
+    if (useQty <= 0 || useQty > remainingStock) {
+        Swal.fire('ข้อผิดพลาด', 'จำนวนที่ระบุไม่ถูกต้อง', 'error');
+        return;
     }
-  } catch (error) {
-    console.error('Error in confirmUseStock:', error);
-    showToast('ระบบขัดข้อง: ' + error.message, true);
-  } finally {
-    confirmBtn.disabled = false;
-    confirmText.textContent = 'ยืนยันตัดสต็อก';
-  }
+
+    const confirmBtn = document.getElementById('confirm-use-btn');
+    confirmBtn.disabled = true;
+
+    try {
+        const saveResult = await saveInventoryToSheet(item, useQty);
+        if (saveResult.success) {
+            const newUsed = (item.usedQuantity || 0) + useQty;
+            const finalRemaining = item.quantity - newUsed;
+
+            if (finalRemaining <= 0) {
+                inventoryData.splice(itemIndex, 1);
+                Swal.fire({
+                    title: 'สินค้าหมดสต็อก!',
+                    text: 'ระบบลบรายการนี้ออกจากฐานข้อมูลแล้วค่ะ',
+                    icon: 'success',
+                    timer: 2000
+                });
+            } else {
+                inventoryData[itemIndex].usedQuantity = newUsed;
+                Swal.fire('สำเร็จ', `เบิกใช้งาน ${useQty} ชิ้น เรียบร้อยค่ะ`, 'success');
+            }
+            
+            renderInventory(inventoryData);
+            updateStats(inventoryData);
+            if (currentPage === 'dashboard') updateDashboard();
+            hideUseStockModal();
+        }
+    } catch (error) {
+        Swal.fire('เกิดข้อผิดพลาด', error.message, 'error');
+    } finally {
+        confirmBtn.disabled = false;
+    }
+}
+function renderInventory(data) {
+    const tbody = document.getElementById('inventory-body');
+    const emptyState = document.getElementById('empty-state');
+    
+    let filteredData = data;
+    if (currentFilter) {
+        filteredData = data.filter(item => item.categoryId === currentFilter);
+    }
+    
+    // --- จุดที่แก้ไข: เรียงลำดับวันหมดอายุ ---
+    // เอาตัวที่วันเหลือน้อยที่สุด (หรือติดลบมากที่สุด) ขึ้นก่อน
+    const sortedData = [...filteredData].sort((a, b) => {
+        const daysA = getExpiryInfo(a.expiryDate).days;
+        const daysB = getExpiryInfo(b.expiryDate).days;
+        return daysA - daysB; 
+    });
+    
+    if (sortedData.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+    }
+    
+    emptyState.style.display = 'none';
+    tbody.innerHTML = '';
+    
+    sortedData.forEach(item => {
+        const category = categories.find(c => c.id === item.categoryId);
+        const expiryInfo = getExpiryInfo(item.expiryDate);
+        const remainingStock = (item.quantity || 0) - (item.usedQuantity || 0);
+        
+        // ถ้าไม่มีวันที่ (Invalid Date) จะให้แสดงคำว่า "ไม่ระบุ"
+        const displayDate = item.expiryDate ? formatDate(item.expiryDate) : 'ไม่ระบุ';
+        
+        const row = document.createElement('tr');
+        if (expiryInfo.status === 'expired') row.classList.add('expired');
+        else if (expiryInfo.status === 'warning') row.classList.add('warning');
+        
+        row.innerHTML = `
+            <td>${category?.imageUrl ? `<img src="${category.imageUrl}" class="item-image">` : `<div class="item-image-placeholder">...</div>`}</td>
+            <td><span class="fw-medium">${item.itemType}</span></td>
+            <td><span class="stock-badge">${remainingStock} ชิ้น</span></td>
+            <td><code class="small">${item.lotNumber}</code></td>
+            <td><span class="expiry-badge ${expiryInfo.status}">${displayDate}</span></td>
+            <td>
+                <strong class="${expiryInfo.status === 'expired' ? 'text-danger' : 'text-dark'}">
+                    ${expiryInfo.days} วัน
+                </strong>
+            </td>
+            <td>
+                <div class="d-flex gap-2">
+                    <button class="action-btn use" onclick="showUseStockModal('${item.id}')">เบิก</button>
+                    <button class="action-btn delete" onclick="showDeleteModal('${item.id}')">ลบ</button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
 }
 
     function showDeleteModal(id) {
