@@ -2264,138 +2264,63 @@
       }
     }
 
-    function parseSheetDate(dateStr) {
-      if (!dateStr || dateStr === '') return new Date().toISOString();
-      
-      const dateString = String(dateStr).trim();
-      if (dateString === '') return new Date().toISOString();
-      
-      // รูปแบบ DD/MM/YYYY หรือ D/M/YYYY
-      if (dateString.includes('/')) {
-        const parts = dateString.split('/');
-        if (parts.length === 3) {
-          let day = parseInt(parts[0]);
-          let month = parseInt(parts[1]) - 1;
-          let year = parseInt(parts[2]);
-          
-          // รองรับปี พ.ศ. (ถ้าเป็น 4 หลักและมากกว่า 2500)
-          if (year > 2500) {
-            year = year - 543;
-          }
-          
-          const parsedDate = new Date(year, month, day);
-          if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() === year && parsedDate.getMonth() === month && parsedDate.getDate() === day) {
-            return parsedDate.toISOString();
-          }
-        }
-      }
-      
-      // รูปแบบ DD-MM-YYYY หรือ D-M-YYYY
-      if (dateString.includes('-') && dateString.split('-')[0].length <= 2) {
-        const parts = dateString.split('-');
-        if (parts.length === 3) {
-          let day = parseInt(parts[0]);
-          let month = parseInt(parts[1]) - 1;
-          let year = parseInt(parts[2]);
-          
-          // รองรับปี พ.ศ.
-          if (year > 2500) {
-            year = year - 543;
-          }
-          
-          const parsedDate = new Date(year, month, day);
-          if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() === year && parsedDate.getMonth() === month && parsedDate.getDate() === day) {
-            return parsedDate.toISOString();
-          }
-        }
-      }
-      
-      // รูปแบบ YYYY-MM-DD (ISO standard)
-      if (dateString.includes('-') && dateString.split('-')[0].length === 4) {
-        const parsedDate = new Date(dateString);
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate.toISOString();
-        }
-      }
-      
-      // รูปแบบ MM/DD/YYYY (US format)
-      if (dateString.includes('/')) {
-        const parts = dateString.split('/');
-        if (parts.length === 3) {
-          let month = parseInt(parts[0]) - 1;
-          let day = parseInt(parts[1]);
-          let year = parseInt(parts[2]);
-          
-          // ตรวจสอบว่าเป็น US format (เดือนมากกว่า 12 ไม่ได้)
-          if (month >= 0 && month < 12) {
-            if (year > 2500) {
-              year = year - 543;
-            }
-            
-            const parsedDate = new Date(year, month, day);
-            if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() === year && parsedDate.getMonth() === month && parsedDate.getDate() === day) {
-              return parsedDate.toISOString();
-            }
-          }
-        }
-      }
-      
-      // รูปแบบภาษาไทย เช่น "1 มกราคม 2567"
-      const thaiMonths = {
-        'มกราคม': 0, 'ม.ค.': 0, 'มค': 0, 'ม.ค': 0,
-        'กุมภาพันธ์': 1, 'ก.พ.': 1, 'กพ': 1, 'ก.พ': 1,
-        'มีนาคม': 2, 'มี.ค.': 2, 'มีค': 2, 'มี.ค': 2,
-        'เมษายน': 3, 'เม.ย.': 3, 'เมย': 3, 'เม.ย': 3,
-        'พฤษภาคม': 4, 'พ.ค.': 4, 'พค': 4, 'พ.ค': 4,
-        'มิถุนายน': 5, 'มิ.ย.': 5, 'มิย': 5, 'มิ.ย': 5,
-        'กรกฎาคม': 6, 'ก.ค.': 6, 'กค': 6, 'ก.ค': 6,
-        'สิงหาคม': 7, 'ส.ค.': 7, 'สค': 7, 'ส.ค': 7,
-        'กันยายน': 8, 'ก.ย.': 8, 'กย': 8, 'ก.ย': 8,
-        'ตุลาคม': 9, 'ต.ค.': 9, 'ตค': 9, 'ต.ค': 9,
-        'พฤศจิกายน': 10, 'พ.ย.': 10, 'พย': 10, 'พ.ย': 10,
-        'ธันวาคม': 11, 'ธ.ค.': 11, 'ธค': 11, 'ธ.ค': 11
-      };
-      
-      for (const [thaiMonth, monthIndex] of Object.entries(thaiMonths)) {
-        if (dateString.includes(thaiMonth)) {
-          const parts = dateString.split(/\s+/).filter(p => p.trim());
-          if (parts.length >= 3) {
-            const day = parseInt(parts[0]);
-            let year = parseInt(parts[2]);
-            
-            // แปลง พ.ศ. เป็น ค.ศ.
-            if (year > 2500) {
-              year = year - 543;
-            }
-            
-            const parsedDate = new Date(year, monthIndex, day);
-            if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() === year && parsedDate.getMonth() === monthIndex && parsedDate.getDate() === day) {
-              return parsedDate.toISOString();
-            }
-          }
-          break;
-        }
-      }
-      
-      // รูปแบบ timestamp หรือ epoch
-      const numericDate = Number(dateString);
-      if (!isNaN(numericDate) && numericDate > 0) {
-        const parsedDate = new Date(numericDate);
-        if (!isNaN(parsedDate.getTime())) {
-          return parsedDate.toISOString();
-        }
-      }
-      
-      // ลองใช้ Date parser ของ JavaScript
-      const date = new Date(dateString);
-      if (!isNaN(date.getTime())) {
-        return date.toISOString();
-      }
-      
-      // ถ้าแปลงไม่ได้เลย ใช้วันที่ปัจจุบัน
-      console.warn('Cannot parse date:', dateString, '- using current date');
-      return new Date().toISOString();
+function parseSheetDate(dateStr) {
+  // 1. ถ้าไม่มีข้อมูล ให้ส่งค่าวันที่ไกลมากๆ กลับไปเพื่อให้ไปอยู่ท้ายตาราง
+  if (!dateStr || String(dateStr).trim() === '') {
+    return new Date(2500, 0, 1); 
+  }
+
+  try {
+    let dateString = String(dateStr).trim();
+    
+    // 2. ถ้าเป็นรูปแบบ ISO String ที่มาจากระบบอยู่แล้ว (เช่น 2024-12-31T00:00:00.000Z)
+    if (dateString.includes('T') && !isNaN(Date.parse(dateString))) {
+      let d = new Date(dateString);
+      if (d.getFullYear() > 2500) d.setFullYear(d.getFullYear() - 543);
+      return d;
     }
+
+    // 3. จัดการรูปแบบยอดฮิต DD/MM/YYYY หรือ DD-MM-YYYY
+    let separator = dateString.includes('/') ? '/' : (dateString.includes('-') ? '-' : null);
+    
+    if (separator) {
+      let parts = dateString.split(separator);
+      if (parts.length === 3) {
+        let day, month, year;
+        
+        // ตรวจสอบว่าปีอยู่หน้าหรือหลัง (YYYY-MM-DD vs DD-MM-YYYY)
+        if (parts[0].length === 4) { // YYYY-MM-DD
+          year = parseInt(parts[0]);
+          month = parseInt(parts[1]) - 1;
+          day = parseInt(parts[2]);
+        } else { // DD-MM-YYYY
+          day = parseInt(parts[0]);
+          month = parseInt(parts[1]) - 1;
+          year = parseInt(parts[2]);
+        }
+
+        // แก้ปัญหาปี พ.ศ.
+        if (year > 2500) year -= 543;
+        
+        let d = new Date(year, month, day);
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+
+    // 4. กรณีสุดท้าย: พยายามให้ JavaScript แปลงเอง
+    let finalTry = new Date(dateString);
+    if (!isNaN(finalTry.getTime())) {
+      if (finalTry.getFullYear() > 2500) finalTry.setFullYear(finalTry.getFullYear() - 543);
+      return finalTry;
+    }
+
+  } catch (e) {
+    console.error("Error parsing date:", dateStr, e);
+  }
+
+  // ถ้าสุดทางแล้วแปลงไม่ได้จริงๆ ให้ส่งค่าวันที่ไกลๆ ไป (เพื่อไม่ให้ขึ้น NaN ในการคำนวณ)
+  return new Date(2500, 0, 1);
+}
 
     function updateCategorySelects() {
       const categorySelect = document.getElementById('category-select');
@@ -2488,20 +2413,25 @@ document.getElementById('item-form').addEventListener('submit', async function(e
       generateLotNumber();
     }
 
-    function getExpiryInfo(expiryDate) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const expiry = new Date(expiryDate);
-      expiry.setHours(0, 0, 0, 0);
-      const diffTime = expiry - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      let status = 'safe';
-      if (diffDays <= 0) status = 'expired';
-      else if (diffDays <= 7) status = 'warning';
-      
-      return { status, days: diffDays };
-    }
+function getExpiryInfo(expiryDateStr) {
+  const expiryDate = parseSheetDate(expiryDateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // ถ้าเป็นวันที่ที่แปลงไม่ได้
+  if (expiryDate.getTime() > 8000000000000000) {
+    return { status: 'safe', days: 9999 };
+  }
+
+  const diffTime = expiryDate - today;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  let status = 'safe';
+  if (diffDays <= 0) status = 'expired';
+  else if (diffDays <= 7) status = 'warning';
+  
+  return { status, days: diffDays };
+}
 
     function formatDate(dateStr) {
       const date = new Date(dateStr);
@@ -2666,63 +2596,61 @@ async function confirmDelete() {
     });
 
 function renderInventory(data) {
-    const tbody = document.getElementById('inventory-body');
-    const emptyState = document.getElementById('empty-state');
-    
-    let filteredData = data;
-    if (currentFilter) {
-        filteredData = data.filter(item => item.categoryId === currentFilter);
-    }
-    
-    // --- จุดที่แก้ไข: เรียงลำดับวันหมดอายุ ---
-    // เอาตัวที่วันเหลือน้อยที่สุด (หรือติดลบมากที่สุด) ขึ้นก่อน
-    const sortedData = [...filteredData].sort((a, b) => {
-        const daysA = getExpiryInfo(a.expiryDate).days;
-        const daysB = getExpiryInfo(b.expiryDate).days;
-        return daysA - daysB; 
-    });
-    
-    if (sortedData.length === 0) {
-        tbody.innerHTML = '';
-        emptyState.style.display = 'block';
-        return;
-    }
-    
-    emptyState.style.display = 'none';
+  const tbody = document.getElementById('inventory-body');
+  const emptyState = document.getElementById('empty-state');
+  
+  let filteredData = currentFilter ? data.filter(item => item.categoryId === currentFilter) : data;
+
+  // เรียงลำดับ: เอาตัวที่วันเหลือน้อยที่สุด (ติดลบเยอะสุด) ขึ้นก่อนแบบยาวๆ
+  const sortedData = [...filteredData].sort((a, b) => {
+    const infoA = getExpiryInfo(a.expiryDate);
+    const infoB = getExpiryInfo(b.expiryDate);
+    return infoA.days - infoB.days;
+  });
+
+  if (sortedData.length === 0) {
     tbody.innerHTML = '';
+    emptyState.style.display = 'block';
+    return;
+  }
+
+  emptyState.style.display = 'none';
+  tbody.innerHTML = '';
+  
+  sortedData.forEach(item => {
+    const category = categories.find(c => c.id === item.categoryId);
+    const expiryInfo = getExpiryInfo(item.expiryDate);
+    const remainingStock = (parseInt(item.quantity) || 0) - (parseInt(item.usedQuantity) || 0);
     
-    sortedData.forEach(item => {
-        const category = categories.find(c => c.id === item.categoryId);
-        const expiryInfo = getExpiryInfo(item.expiryDate);
-        const remainingStock = (item.quantity || 0) - (item.usedQuantity || 0);
-        
-        // ถ้าไม่มีวันที่ (Invalid Date) จะให้แสดงคำว่า "ไม่ระบุ"
-        const displayDate = item.expiryDate ? formatDate(item.expiryDate) : 'ไม่ระบุ';
-        
-        const row = document.createElement('tr');
-        if (expiryInfo.status === 'expired') row.classList.add('expired');
-        else if (expiryInfo.status === 'warning') row.classList.add('warning');
-        
-        row.innerHTML = `
-            <td>${category?.imageUrl ? `<img src="${category.imageUrl}" class="item-image">` : `<div class="item-image-placeholder">...</div>`}</td>
-            <td><span class="fw-medium">${item.itemType}</span></td>
-            <td><span class="stock-badge">${remainingStock} ชิ้น</span></td>
-            <td><code class="small">${item.lotNumber}</code></td>
-            <td><span class="expiry-badge ${expiryInfo.status}">${displayDate}</span></td>
-            <td>
-                <strong class="${expiryInfo.status === 'expired' ? 'text-danger' : 'text-dark'}">
-                    ${expiryInfo.days} วัน
-                </strong>
-            </td>
-            <td>
-                <div class="d-flex gap-2">
-                    <button class="action-btn use" onclick="showUseStockModal('${item.id}')">เบิก</button>
-                    <button class="action-btn delete" onclick="showDeleteModal('${item.id}')">ลบ</button>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
+    // แสดงวันที่ในรูปแบบที่อ่านง่าย
+    const d = parseSheetDate(item.expiryDate);
+    const displayDate = d.getTime() > 8000000000000000 ? 'ไม่ระบุ' : d.toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' });
+
+    const row = document.createElement('tr');
+    if (expiryInfo.status === 'expired') row.classList.add('expired');
+    else if (expiryInfo.status === 'warning') row.classList.add('warning');
+
+    row.innerHTML = `
+      <td>${category?.imageUrl ? `<img src="${category.imageUrl}" class="item-image">` : `<div class="item-image-placeholder">...</div>`}</td>
+      <td><span class="fw-medium">${item.itemType}</span></td>
+      <td><span class="stock-badge">${remainingStock} ชิ้น</span></td>
+      <td><code class="small">${item.lotNumber}</code></td>
+      <td><span class="expiry-badge ${expiryInfo.status}">${displayDate}</span></td>
+      <td><strong class="${expiryInfo.status === 'expired' ? 'text-danger' : ''}">${expiryInfo.days === 9999 ? 'N/A' : expiryInfo.days + ' วัน'}</strong></td>
+      <td>
+        <div class="d-flex gap-2">
+          <button class="action-btn use" onclick="showUseStockModal('${item.id}')">เบิก</button>
+          <button class="action-btn delete" onclick="showDeleteModal('${item.id}')">ลบ</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(row);
+    
+    const spacer = document.createElement('tr');
+    spacer.className = 'spacer-row';
+    spacer.innerHTML = '<td colspan="7"></td>';
+    tbody.appendChild(spacer);
+  });
 }
 
     function updateStats(data) {
